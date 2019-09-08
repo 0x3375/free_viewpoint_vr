@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 
+using Valve.VR;
 using System.ComponentModel;
 
 
@@ -163,17 +164,23 @@ public class RenderingCS : MonoBehaviour
 
     private static Vector3 hmdPosition;
     private static GameObject hmd;
+    private static HmdQuad_t rect;
 
     private static float prevHmdPosX, prevHmdPosY;
     private static float diffHmdPosX, diffHmdPosY;
+    
+    
+
     // Start is called before the first frame update
     void Start()
     {
 #if USE_HMD
         hmd = GameObject.FindWithTag("sydHMD");
-        hmd.transform.position = transform.position;
-        prevHmdPosX = hmd.transform.position.x;
-        prevHmdPosY = hmd.transform.position.y;
+
+        // SteamVR_PlayArea.GetBounds(Valve.VR.SteamVR_PlayArea.Size._300x225, ref rect);
+
+        prevHmdPosX = hmd.transform.position.z;
+        prevHmdPosY = hmd.transform.position.x;
 #endif
         LFS = GameObject.Find("LFSpace"); // LF
         LFS.GetComponent<Renderer>().enabled = true;
@@ -216,26 +223,25 @@ public class RenderingCS : MonoBehaviour
     {
 #if USE_HMD
         transform.position = hmd.transform.position;
-
-        diffHmdPosX = (transform.position.x - prevHmdPosX); 
-        diffHmdPosY = (transform.position.y - prevHmdPosY);
-
         
+        diffHmdPosX = (hmd.transform.position.z - prevHmdPosX) * 200; 
+        diffHmdPosY = (hmd.transform.position.x - prevHmdPosY) * 200;
 
-        GLO_Y -= (int)Mathf.Round((diffHmdPosX / Mathf.Sqrt(Mathf.Pow(diffHmdPosX, 2) + Mathf.Pow(diffHmdPosY, 2)) * 2), 2 );  // need a scaling factor
-        GLO_X += (int)Mathf.Round((diffHmdPosY / Mathf.Sqrt(Mathf.Pow(diffHmdPosX, 2) + Mathf.Pow(diffHmdPosY, 2)) * 2), 2 );  // need a scaling factor
+        UnityEngine.Debug.Log("Component : (" + diffHmdPosX + ", " + diffHmdPosY + ")");
 
-        UnityEngine.Debug.Log("DiffVec2 : (" + diffHmdPosX.ToString() + ", " + diffHmdPosY + ")");
+        GLO_X += Mathf.RoundToInt(diffHmdPosX);
+        GLO_Y -= Mathf.RoundToInt(diffHmdPosY);
 
         GLO_X = Mathf.Clamp(GLO_X, lowerLimit_gloX, upperLimit_gloX);
         GLO_Y = Mathf.Clamp(GLO_Y, lowerLimit_gloY, upperLimit_gloY);
 
-        UnityEngine.Debug.Log("(" + GLO_X.ToString() + ", " + GLO_Y.ToString() + ")");
+        UnityEngine.Debug.Log("(" + GLO_X.ToString() + ", " + GLO_Y.ToString() + ") - REGION " + REGION);
+
         SetRegion();
         MainFunc(ref tex, ref LFS);
 
-        prevHmdPosX = hmd.transform.position.x;
-        prevHmdPosY = hmd.transform.position.y;
+        prevHmdPosX = hmd.transform.position.z;
+        prevHmdPosY = hmd.transform.position.x;
 #else
 
         rotationY = (int)Mathf.Round(CameraController.getRotationY()) % 360;
@@ -280,7 +286,7 @@ public class RenderingCS : MonoBehaviour
         }
 
 #endif
-        // UnityEngine.Debug.Log("View Position (X, Y) = (" + GLO_X + ", " + GLO_Y + ") -> (componentX, componentY) = ( " + componentX + ", " + componentY + ")" + "rotY : " + rotationY + "[" + i++);
+        // // UnityEngine.Debug.Log("View Position (X, Y) = (" + GLO_X + ", " + GLO_Y + ") -> (componentX, componentY) = ( " + componentX + ", " + componentY + ")" + "rotY : " + rotationY + "[" + i++);
 
         long LoadLF_us = sw_LoadLF.ElapsedTicks / 10;
         long LFUpdate_us = sw_LFUpdate.ElapsedTicks / 10;
@@ -873,8 +879,8 @@ public class RenderingCS : MonoBehaviour
 
         sw_LFUpdate.Stop();
 
-        UnityEngine.Debug.Log("- LF Update : " + sw_LFUpdate.ElapsedTicks / 10 + " us");
-        UnityEngine.Debug.Log("LOAD DONE !!");
+        // UnityEngine.Debug.Log("- LF Update : " + sw_LFUpdate.ElapsedTicks / 10 + " us");
+        // UnityEngine.Debug.Log("LOAD DONE !!");
     }
 
     public static byte[] LoadLF(string inFile, int N)
@@ -884,7 +890,7 @@ public class RenderingCS : MonoBehaviour
         sw_LoadLF.Start();
         byte[] imageData = System.IO.File.ReadAllBytes(inFile);
         sw_LoadLF.Stop();
-        UnityEngine.Debug.Log("LoadLF : " + sw_LoadLF.ElapsedTicks / 10 + " us");
+        // UnityEngine.Debug.Log("LoadLF : " + sw_LoadLF.ElapsedTicks / 10 + " us");
 
         return imageData;
     }
@@ -992,7 +998,7 @@ public class RenderingCS : MonoBehaviour
         sw_ParallelFor.Restart();
 #if USE_CUDA
         int errorCode = CudaParallelFor(IMG, LF, Alloc_Angle_s, times, Y, POS_Y, POS_X, LFUW, DATAW, WIDTH, HEIGHT, out_w, dir, LF.Length);
-        UnityEngine.Debug.Log("\t\t\tERROR CODE " + errorCode.ToString());
+        // UnityEngine.Debug.Log("\t\t\tERROR CODE " + errorCode.ToString());
 #else
         Parallel.For(0, out_w, (w) =>
         //for (int w = 0; w < out_w; w++)
@@ -1118,7 +1124,7 @@ public class RenderingCS : MonoBehaviour
         sw_ParallelFor.Restart();
 #if USE_CUDA
         int errorCode = CudaParallelFor(IMG, LF, Alloc_Angle_s, times, Y, POS_Y, POS_X, LFUW, DATAW, WIDTH, HEIGHT, out_w, dir, LF.Length);
-        UnityEngine.Debug.Log("\t\t\tERROR CODE " + errorCode.ToString());
+        // UnityEngine.Debug.Log("\t\t\tERROR CODE " + errorCode.ToString());
 #else
         Parallel.For(0, out_w, (w) =>
         //for (int w = 0; w < out_w; w++)
@@ -1453,7 +1459,7 @@ public class RenderingCS : MonoBehaviour
         gameobj.GetComponent<Renderer>().material.mainTexture = tex2D;
 
         sw_MainFunc.Stop();
-        // UnityEngine.Debug.Log(" - - - MainFunc : " + sw_MainFunc.ElapsedTicks / 10 + " us");
+        // // UnityEngine.Debug.Log(" - - - MainFunc : " + sw_MainFunc.ElapsedTicks / 10 + " us");
     }
 
     static void DisplayMemory()
